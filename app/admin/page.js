@@ -122,7 +122,7 @@ function Familia({ f, env, nFotos, rostos, recarregar }) {
             <div style={{ height: 8, borderRadius: 4, background: 'var(--line)', overflow: 'hidden', margin: '8px 0' }}><div style={{ height: '100%', width: Math.min(100, pago / f.valor * 100) + '%', background: 'var(--ok)' }} /></div>
             {parcelas(f).map(pc => {
               const u = env.filter(x => x.parcela === pc.n).sort((a, b) => b.criado_em.localeCompare(a.criado_em))[0]
-              const s = !u ? ['pe', 'Aguardando'] : u.status === 'confirmado' ? ['ok', 'Pago'] : u.status === 'enviado' ? ['an', 'Conferir'] : ['pe', 'Pedido reenvio']
+              const s = !u ? ['pe', 'Aguardando'] : u.status === 'confirmado' ? ['ok', 'Pago'] : u.status === 'enviado' ? ['an', 'Conferir'] : ['pe', 'Reenvio pedido']
               return (
                 <div key={pc.n} className="parc">
                   <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -247,7 +247,7 @@ export default function Admin() {
             <label>Cidade do favorecido<input value={cfg.pix_cidade} onChange={c('pix_cidade')} /></label>
             <label>Custo fixo (equipe, áudio, extras)<input type="number" value={cfg.custo_fixo} onChange={c('custo_fixo')} /></label>
             <label>Custo de cada álbum<input type="number" value={cfg.custo_album} onChange={c('custo_album')} /></label>
-            <label>Vencimento final (multa após)<input type="date" value={cfg.vencimento || ''} onChange={c('vencimento')} /></label>
+            <label>Vencimento final (multa a partir do dia seguinte)<input type="date" value={cfg.vencimento || ''} onChange={c('vencimento')} /></label>
             <label>Multa por atraso (%, máx. 2)<input type="number" step="0.1" min="0" max="2" value={cfg.multa_pct ?? 2} onChange={c('multa_pct')} /></label>
             <label>Juros (% ao mês, máx. 1)<input type="number" step="0.1" min="0" max="1" value={cfg.juros_mes ?? 1} onChange={c('juros_mes')} /></label>
           </div>

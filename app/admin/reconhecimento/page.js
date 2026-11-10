@@ -251,7 +251,7 @@ export default function Reconhecimento() {
               {d && <div className="row" style={{ background: 'var(--warnbg)', borderRadius: 10, padding: 10 }}>
                 <img src={d.crop} alt="Rosto deduzido" width="72" height="72" style={{ borderRadius: 36, objectFit: 'cover' }} />
                 <div style={{ flex: 1, minWidth: 200 }}>
-                  <b style={{ color: 'var(--warn)' }}>Este é {nome(fid).split(' ')[0]}?</b>
+                  <b style={{ color: 'var(--warn)' }}>É {nome(fid).split(' ')[0]}?</b>
                   <div className="mut">Deduzido pelo responsável: juntos em {d.juntos} foto(s), idade estimada {d.idade}.</div>
                 </div>
                 <label className="chk"><input type="checkbox" checked={d.aceito} onChange={e => setDeduz({ ...deduz, [fid]: { ...d, aceito: e.target.checked } })} /> Sim, usar</label>
@@ -285,7 +285,7 @@ export default function Reconhecimento() {
           <h2 style={{ color: 'var(--fg)' }}>Legenda</h2>
           <div><b>Com formando reconhecido</b>: fotos em que o sistema achou pelo menos um formando (ou o responsável dele). Uma foto com vários formandos vai para todos.</div>
           <div><b>Soltas</b>: ninguém reconhecido (rosto de lado, longe, turma). Escolha o destino em cada uma.</div>
-          <div><span className="pill pa">Este é …?</span> família que enviou só o rosto do responsável: o sistema achou a criança que mais aparece ao lado dele. Desmarque "Sim, usar" se estiver errado.</div>
+          <div><span className="pill pa">É … ?</span> família que enviou só o rosto do responsável: o sistema achou a criança que mais aparece ao lado dele. Desmarque "Sim, usar" se estiver errado.</div>
           <div><b>tirar</b>: remove a foto só daquela família. <b>Publicar</b>: envia para as galerias; repetir não duplica fotos.</div>
         </section>
       </>}

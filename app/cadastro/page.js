@@ -50,7 +50,7 @@ export default function Cadastro() {
           auth = r.data; e1 = null
         }
         if (e1) throw e1
-        if (!auth.session) throw new Error('Enviamos um e-mail de confirmação. Confirme, entre no sistema e o cadastro continua daqui.')
+        if (!auth.session) throw new Error('Enviamos um e-mail de confirmação. Confirme o e-mail, entre no sistema e conclua o cadastro.')
         user = auth.user
       }
       const uid = user.id
@@ -75,7 +75,7 @@ export default function Cadastro() {
         if (fam) await sb.from('rostos').insert({ familia_id: fam.id, tipo: 'formando', path: selfie_path, consentimento: true })
       }
       location.href = '/minha-area'
-    } catch (err) { setErro(/load failed|failed to fetch|network/i.test(err.message) ? 'Sem conexão com o servidor. Verifique a internet e o arquivo .env.local.' : err.message) } finally { setEnviando(false) }
+    } catch (err) { setErro(/load failed|failed to fetch|network/i.test(err.message) ? 'Sem conexão com o servidor. Verifique a internet e tente de novo.' : err.message) } finally { setEnviando(false) }
   }
 
   const par = k => <select value={f[k]} onChange={s(k)}><option>Mãe</option><option>Pai</option><option>Avó</option><option>Avô</option><option>Responsável legal</option></select>
@@ -113,7 +113,7 @@ export default function Cadastro() {
 
         <h2>Autorizações</h2>
         <label className="chk"><input type="checkbox" checked={!!f.aceite} onChange={s('aceite')} /> Li e aceito a proposta, os prazos, o valor por formando e a multa de 2% mais juros de 1% ao mês em caso de atraso após a data do evento. (obrigatório)</label>
-        <label className="chk"><input type="checkbox" checked={!!f.bio} onChange={s('bio')} /> Autorizo o uso de uma foto do rosto do formando apenas para separar automaticamente as fotos dele. A foto é apagada após a entrega. (opcional, dá para enviar depois, inclusive o rosto de um responsável no lugar)</label>
+        <label className="chk"><input type="checkbox" checked={!!f.bio} onChange={s('bio')} /> Autorizo o uso de uma foto do rosto do formando apenas para separar automaticamente as fotos dele. A foto é apagada após a entrega. (opcional; também é possível enviar depois, inclusive o rosto de um responsável no lugar do formando)</label>
         {f.bio && <label>Foto do rosto do formando, de frente e com boa luz<input type="file" accept="image/*" onChange={s('selfie')} /></label>}
         <label className="chk"><input type="checkbox" checked={!!f.port} onChange={s('port')} /> Autorizo o uso de imagens do formando na divulgação do trabalho do Léo Vitulli (portfólio e redes). (opcional)</label>
 

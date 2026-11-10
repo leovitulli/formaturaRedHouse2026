@@ -58,8 +58,8 @@ export default function Plaquinhas() {
       <section className="box leg noprint">
         <h2 style={{ color: 'var(--fg)' }}>Como usar</h2>
         <div><b>Imprima</b>: 10 plaquinhas por folha A4 (em pé), no tamanho que aparece aqui na tela, em ordem alfabética do formando. Recorte na linha tracejada. A lista vem dos cadastros; imprima perto do evento para incluir todo mundo.</div>
-        <div><b>Na sessão de fotos</b>: antes de fotografar cada família, faça uma foto da plaquinha. Tudo que vier depois dela, até a próxima plaquinha, é daquela família.</div>
-        <div><b>Número</b>: ordem de chamada na sessão. <b>QR code</b>: identifica a família no sistema; serve para a separação automática das fotos no futuro.</div>
+        <div><b>Na sessão de fotos</b>: antes de fotografar cada família, faça uma foto da plaquinha. Tudo o que vier depois dela, até a próxima plaquinha, é daquela família.</div>
+        <div><b>Número</b>: ordem de chamada na sessão. <b>QR Code</b>: identifica a família no sistema; serve para a separação automática das fotos no futuro.</div>
         <div>{st.fams.length} famílias cadastradas.</div>
       </section>
 
@@ -76,7 +76,7 @@ export default function Plaquinhas() {
             </div>
           </div>
           <img src={f.qr} alt={'QR de ' + f.formando_nome} />
-          <div className="rod">Léo Vitulli · Fotógrafo e Video Maker · Sessão de fotos com a família</div>
+          <div className="rod">Léo Vitulli · Fotógrafo e Videomaker · Sessão de fotos com a família</div>
         </div>
         ))}</div>
       ))}

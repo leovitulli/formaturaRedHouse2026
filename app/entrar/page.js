@@ -11,7 +11,7 @@ export default function Entrar() {
   async function entrar(e) {
     e.preventDefault(); setErro('')
     const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password: senha })
-    if (error) return setErro('E-mail ou senha incorretos.')
+    if (error) return setErro(/fetch|network|load failed/i.test(error.message) || error.status === 0 ? 'Sem conexão com o servidor de login. Avise o Léo.' : 'E-mail ou senha incorretos.')
     const { data: adm } = await sb.from('admins').select('user_id').eq('user_id', data.user.id).maybeSingle()
     location.href = adm ? '/admin' : '/minha-area'
   }

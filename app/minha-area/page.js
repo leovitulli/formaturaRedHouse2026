@@ -99,7 +99,7 @@ function Rostos({ fam, rostos, recarregar }) {
       <ul className="mut">
         <li><b>Melhor opção:</b> uma foto do rosto de {primeiro}, de frente e com boa luz.</li>
         <li><b>Prefere não enviar a do formando?</b> Envie a sua, da mãe ou do pai, de quem vai estar na festa. O sistema acha você nas fotos, identifica {primeiro} ao seu lado e então encontra {primeiro} nas demais.</li>
-        <li>Pode enviar mais de um rosto. Quanto mais referências, mais fotos encontradas.</li>
+        <li>Você pode enviar mais de um rosto. Quanto mais referências, mais fotos encontradas.</li>
       </ul>
       {!!rostos.length && <div className="row">{rostos.map(r => (
         <div key={r.id} style={{ display: 'grid', gap: 4, justifyItems: 'center', width: 96 }}>
@@ -191,11 +191,11 @@ export default function MinhaArea() {
 
       <section className="box leg">
         <h2 style={{ color: 'var(--fg)' }}>Legenda</h2>
-        <div><b>Multa e juros</b>: aplicados só a parcelas não pagas até o dia do evento; o valor da parcela e o QR Code já mostram o total atualizado.</div>
-        <div><span className="pill pe">Aguardando pagamento</span> ainda não recebemos comprovante dessa parcela.</div>
+        <div><b>Multa e juros</b>: aplicados somente às parcelas não pagas até o dia do evento. O valor da parcela e o QR Code já mostram o total atualizado.</div>
+        <div><span className="pill pe">Aguardando pagamento</span> ainda não recebemos o comprovante desta parcela.</div>
         <div><span className="pill an">Comprovante em análise</span> recebemos o comprovante e vamos conferir no extrato.</div>
         <div><span className="pill ok">Pago</span> pagamento conferido e confirmado.</div>
-        <div><span className="pill pe">Pendente</span> depois de um pedido de novo comprovante: o motivo aparece na parcela; envie outro.</div>
+        <div><span className="pill pe">Pendente</span> foi pedido um novo comprovante. O motivo aparece na parcela; envie outro.</div>
       </section>
     </main>
   )
