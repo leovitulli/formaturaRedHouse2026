@@ -1,10 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { sb, cpfValido } from '@/lib/util'
+import { textoProposta, VERSAO } from '@/lib/proposta'
 
 export default function Cadastro() {
   const [f, setF] = useState({ forma: 'avista', p1: 'Mãe', p2: 'Pai' })
   const [logado, setLogado] = useState(null)
+  const [cfg, setCfg] = useState(null)
+  useEffect(() => { sb.from('config').select('*').single().then(({ data }) => setCfg(data)) }, [])
   useEffect(() => {
     sb.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) return
@@ -30,6 +33,7 @@ export default function Cadastro() {
     if (!logado && !/\S+@\S+\.\S+/.test(f.email || '')) return setErro('Digite um e-mail válido.')
     if ((f.tel || '').replace(/\D/g, '').length < 10) return setErro('Digite um telefone com DDD.')
     if (!logado && (f.senha || '').length < 6) return setErro('A senha precisa ter pelo menos 6 caracteres.')
+    if (!cfg) return setErro('Carregando a proposta, aguarde um instante e tente de novo.')
     if (!f.aceite) return setErro('Para continuar, marque que leu e aceita a proposta.')
     if (f.bio && !f.selfie) return setErro('Envie uma foto do rosto do formando ou desmarque a autorização de reconhecimento.')
 
@@ -62,7 +66,8 @@ export default function Cadastro() {
         resp2_nome: f.r2?.trim() || null, resp2_parentesco: f.r2 ? f.p2 : null,
         email, telefone: f.tel, forma_pagamento: f.forma,
         aceite_proposta: true, aceite_biometria: !!f.bio, aceite_portfolio: !!f.port,
-        aceite_navegador: navigator.userAgent.slice(0, 300), selfie_path
+        aceite_navegador: navigator.userAgent.slice(0, 300), selfie_path,
+        aceite_texto: textoProposta(cfg?.preco ?? 630, cfg || {}), aceite_versao: VERSAO
       })
       if (e2) throw new Error('Não foi possível salvar o cadastro. Tente de novo.')
       if (selfie_path) {
@@ -114,7 +119,7 @@ export default function Cadastro() {
 
         {erro && <p className="err" role="alert">{erro}</p>}
         <div><button className="p" disabled={enviando}>{enviando ? 'Enviando…' : 'Assinar e ir para o pagamento'}</button></div>
-        <p className="mut">Ao assinar, registramos data, hora e navegador do aceite como assinatura eletrônica.</p>
+        <p className="mut">Ao assinar, registramos data, hora, endereço IP, navegador e o texto integral da proposta (versão {VERSAO}) como assinatura eletrônica (Lei 14.063/2020 e MP 2.200-2/2001, art. 10, §2º).</p>
       </form>
     </main>
   )

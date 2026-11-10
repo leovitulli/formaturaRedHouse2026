@@ -1,9 +1,14 @@
 {
   "name": "formatura-red-house",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",
+    "@vladmandic/face-api": "1.7.13",
     "next": "14.2.15",
     "qrcode": "1.5.4",
     "react": "18.3.1",

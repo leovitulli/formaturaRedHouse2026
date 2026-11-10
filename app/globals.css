@@ -42,3 +42,9 @@ button:disabled{opacity:.6;cursor:wait}
 .leg{font-size:13.5px;color:var(--mut);display:grid;gap:5px}
 .leg b{color:var(--fg)}
 .total{font-size:22px;font-weight:700}
+.det{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:12px;background:var(--bg)}
+.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.det .card{display:block}
+.av{width:38px;height:38px;border-radius:50%;background:var(--infobg);color:var(--info);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.parc{border-top:1px solid var(--line);padding:8px 0}
+.parc:first-of-type{border-top:none}

@@ -10,10 +10,10 @@ function Parcela({ p, fam, cfg, envios, recarregar }) {
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  const pix = pixPayload({ chave: cfg.pix_chave, nome: cfg.pix_nome, cidade: cfg.pix_cidade, valor: valorPagar, txid: 'FORM' + fam.id.slice(0, 8) + 'P' + p.n })
   const aberta = !ult || ult.status === 'recusado'
   const enc = encargos(p.valor, cfg)
   const valorPagar = aberta ? enc.total : p.valor
+  const pix = pixPayload({ chave: cfg.pix_chave, nome: cfg.pix_nome, cidade: cfg.pix_cidade, valor: valorPagar, txid: 'FORM' + fam.id.slice(0, 8) + 'P' + p.n })
   useEffect(() => { if (aberta) QRCode.toDataURL(pix, { width: 220, margin: 1 }).then(setQr) }, [pix, aberta])
 
   async function enviar() {
