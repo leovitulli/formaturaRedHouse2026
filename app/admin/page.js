@@ -155,6 +155,23 @@ function Familia({ f, env, nFotos, rostos, cfg, recarregar }) {
           </div>
         </div>
         {nFotos > 0 && <GaleriaAdmin fid={f.id} nFotos={nFotos} recarregar={recarregar} />}
+        <details style={{ fontSize: 13 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--mut)' }}>Todos os dados do cadastro</summary>
+          <div className="card" style={{ marginTop: 8, display: 'grid', gap: 4, fontSize: 12.5 }}>
+            <div><b>ID:</b> <code>{f.id}</code></div>
+            <div><b>User ID:</b> <code>{f.user_id}</code></div>
+            <div><b>Formando:</b> {f.formando_nome}</div>
+            <div><b>Responsável 1:</b> {f.resp1_nome} ({f.resp1_parentesco}) · CPF {f.resp1_cpf}</div>
+            <div><b>Responsável 2:</b> {f.resp2_nome ? `${f.resp2_nome} (${f.resp2_parentesco || '—'})` : '—'}</div>
+            <div><b>Contato:</b> {f.telefone} · {f.email}</div>
+            <div><b>Pagamento:</b> {f.forma_pagamento === '2x' ? '2x' : 'À vista'} · {brl(f.valor)}</div>
+            <div><b>Autorizações:</b> Proposta: {f.aceite_proposta ? 'Sim' : 'Não'} · Reconhecimento facial: {f.aceite_biometria ? 'Sim' : 'Não'} · Portfólio: {f.aceite_portfolio ? 'Sim' : 'Não'}</div>
+            <div><b>Aceite em:</b> {data(f.aceite_em)} · <b>Criado em:</b> {data(f.criado_em)}</div>
+            <div><b>IP do aceite:</b> {f.aceite_ip || '—'} · <b>Versão:</b> {f.aceite_versao || '—'}</div>
+            <div style={{ wordBreak: 'break-all' }}><b>Hash SHA-256:</b> <code>{f.aceite_hash || '—'}</code></div>
+            <div style={{ wordBreak: 'break-all' }}><b>Navegador:</b> {f.aceite_navegador || '—'}</div>
+          </div>
+        </details>
         <div style={{ textAlign: 'right' }}><BotaoConfirmar txt="Excluir cadastro" onOk={apagar} /></div>
       </div>}
     </div>
@@ -225,6 +242,26 @@ export default function Admin() {
   const aConferir = pags.filter(p => p.status === 'enviado').length
   const c = k => e => setCfg({ ...cfg, [k]: e.target.value })
 
+  function exportarCsv() {
+    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const cab = ['Formando', 'Responsavel 1', 'Parentesco 1', 'CPF', 'Responsavel 2', 'Parentesco 2', 'Telefone', 'E-mail', 'Forma', 'Valor', 'Pago', 'Falta', 'Status', 'Aceite em', 'IP', 'Versao', 'Autoriza reconhecimento', 'Autoriza portfolio', 'Rostos', 'Fotos', 'ID']
+    const linhas = fams.map(f => {
+      const env = pags.filter(p => p.familia_id === f.id)
+      const pago = env.filter(x => x.status === 'confirmado').reduce((s, x) => s + +x.valor, 0)
+      const analise = env.some(x => x.status === 'enviado')
+      const status = pago >= f.valor ? 'Quitado' : analise ? 'Comprovante em analise' : pago > 0 ? 'Parcial' : 'Pendente'
+      const nR = rostos.filter(r => r.familia_id === f.id).length
+      const nF = fotos.filter(x => x.familia_id === f.id).length
+      return [f.formando_nome, f.resp1_nome, f.resp1_parentesco, f.resp1_cpf, f.resp2_nome || '', f.resp2_parentesco || '', f.telefone, f.email, f.forma_pagamento, f.valor, pago, Math.max(f.valor - pago, 0), status, data(f.aceite_em), f.aceite_ip || '', f.aceite_versao || '', f.aceite_biometria ? 'Sim' : 'Nao', f.aceite_portfolio ? 'Sim' : 'Nao', nR, nF, f.id].map(esc).join(';')
+    })
+    const blob = new Blob(['\uFEFF' + [cab.map(esc).join(';'), ...linhas].join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `formatura-cadastros-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   return (
     <main>
       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -249,7 +286,10 @@ export default function Admin() {
       </section>
 
       <section className="box">
-        <h2>Formandos</h2>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h2>Formandos</h2>
+          {!!fams.length && <button type="button" onClick={exportarCsv}>Exportar planilha (CSV)</button>}
+        </div>
         {!fams.length ? <p className="mut">Nenhuma família cadastrada ainda. Envie o link da proposta para os pais.</p>
           : fams.map(f => <Familia key={f.id} f={f} env={pags.filter(p => p.familia_id === f.id)} nFotos={fotos.filter(x => x.familia_id === f.id).length} rostos={rostos.filter(r => r.familia_id === f.id)} cfg={cfg} recarregar={carregar} />)}
       </section>
