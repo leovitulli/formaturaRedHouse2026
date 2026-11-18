@@ -158,8 +158,9 @@ export default function Admin() {
   const [st, setSt] = useState(null)
   const [cfg, setCfg] = useState(null)
   const [salvo, setSalvo] = useState(false)
+  const [aoVivo, setAoVivo] = useState(false)
 
-  async function carregar() {
+  async function carregar(forcarCfg = false) {
     const { data: { session } } = await sb.auth.getSession()
     if (!session) return (location.href = '/entrar')
     const { data: adm } = await sb.from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
@@ -170,9 +171,28 @@ export default function Admin() {
       sb.from('fotos').select('familia_id'),
       sb.from('config').select('*').single(),
       sb.from('rostos').select('id,familia_id,tipo,path')])
-    setSt({ fams: a.data || [], pags: b.data || [], fotos: c.data || [], rostos: e.data || [] }); setCfg(d.data)
+    setSt({ fams: a.data || [], pags: b.data || [], fotos: c.data || [], rostos: e.data || [] })
+    setCfg(prev => (forcarCfg || !prev) ? d.data : prev)
   }
-  useEffect(() => { carregar() }, [])
+  useEffect(() => {
+    carregar(true)
+    const ch = sb.channel('admin-ao-vivo')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'familias' }, () => carregar())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pagamentos' }, () => carregar())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fotos' }, () => carregar())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rostos' }, () => carregar())
+      .subscribe(status => setAoVivo(status === 'SUBSCRIBED'))
+    const aoFocar = () => { if (document.visibilityState !== 'hidden') carregar() }
+    window.addEventListener('focus', aoFocar)
+    document.addEventListener('visibilitychange', aoFocar)
+    const timer = setInterval(() => carregar(), 15000)
+    return () => {
+      sb.removeChannel(ch)
+      window.removeEventListener('focus', aoFocar)
+      document.removeEventListener('visibilitychange', aoFocar)
+      clearInterval(timer)
+    }
+  }, [])
 
   async function salvarCfg(e) {
     e.preventDefault()
@@ -202,7 +222,7 @@ export default function Admin() {
     <main>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h1>Painel da formatura</h1>
-        <div className="row"><a className="btn p" href="/admin/reconhecimento">Separar fotos</a><a className="btn" href="/admin/plaquinhas">Plaquinhas</a><a className="btn" href="/admin/relatorio">Relatório jurídico</a><button onClick={carregar}>Atualizar</button><button onClick={async () => { await sb.auth.signOut(); location.href = '/' }}>Sair</button></div>
+        <div className="row"><span className={'pill ' + (aoVivo ? 'ok' : 'pe')} title="Atualiza automaticamente quando uma família assinar ou enviar comprovante">{aoVivo ? '● Ao vivo' : 'Atualização automática'}</span><a className="btn p" href="/admin/reconhecimento">Separar fotos</a><a className="btn" href="/admin/plaquinhas">Plaquinhas</a><a className="btn" href="/admin/relatorio">Relatório jurídico</a><button onClick={() => carregar(true)}>Atualizar</button><button onClick={async () => { await sb.auth.signOut(); location.href = '/' }}>Sair</button></div>
       </div>
 
       <section className="box">
