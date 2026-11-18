@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { sb, brl, data, parcelas } from '@/lib/util'
+import { sb, brl, data, parcelas, encargos } from '@/lib/util'
 
 async function abrir(bucket, path) {
   const { data: d } = await sb.storage.from(bucket).createSignedUrl(path, 600)
@@ -63,7 +63,7 @@ function GaleriaAdmin({ fid, nFotos, recarregar }) {
   )
 }
 
-function Familia({ f, env, nFotos, rostos, recarregar }) {
+function Familia({ f, env, nFotos, rostos, cfg, recarregar }) {
   const [aberta, setAberta] = useState(false)
   const [up, setUp] = useState('')
   const pago = env.filter(x => x.status === 'confirmado').reduce((s, x) => s + +x.valor, 0)
@@ -109,6 +109,7 @@ function Familia({ f, env, nFotos, rostos, recarregar }) {
             </div>
             {f.resp2_nome && <div className="mut" style={{ marginTop: 6 }}>+ {f.resp2_nome} ({f.resp2_parentesco})</div>}
             <div className="mut" style={{ marginTop: 6, wordBreak: 'break-all' }}>{f.telefone} · {f.email}</div>
+            <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Assinou em {data(f.aceite_em)}</div>
             <div className="row" style={{ marginTop: 8, gap: 6 }}>
               <span className={'pill ' + (rostos.length ? 'ok' : 'pe')}>{rostos.length ? '✓' : '✗'} Rosto</span>
               <span className={'pill ' + (f.aceite_portfolio ? 'ok' : 'pe')}>{f.aceite_portfolio ? '✓' : '✗'} Portfólio</span>
@@ -123,12 +124,18 @@ function Familia({ f, env, nFotos, rostos, recarregar }) {
             {parcelas(f).map(pc => {
               const u = env.filter(x => x.parcela === pc.n).sort((a, b) => b.criado_em.localeCompare(a.criado_em))[0]
               const s = !u ? ['pe', 'Aguardando'] : u.status === 'confirmado' ? ['ok', 'Pago'] : u.status === 'enviado' ? ['an', 'Conferir'] : ['pe', 'Reenvio pedido']
+              const vencBr = cfg?.vencimento ? new Date(cfg.vencimento + 'T12:00').toLocaleDateString('pt-BR') : '12/12/2026'
+              const prazo = pc.n === 1 ? `no aceite (${new Date(f.aceite_em).toLocaleDateString('pt-BR')})` : `até ${vencBr}`
+              const enc = (!u || u.status === 'recusado') ? encargos(pc.valor, cfg) : { dias: 0 }
               return (
                 <div key={pc.n} className="parc">
                   <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <span className="num"><b>{brl(u?.valor ?? pc.valor)}</b> <span className="mut">{parcelas(f).length > 1 ? `${pc.n}ª parcela` : 'à vista'}</span></span>
+                    <span className="num"><b>{brl(u?.valor ?? pc.valor)}</b> <span className="mut">{parcelas(f).length > 1 ? `${pc.n}ª parcela` : 'à vista'} · {prazo}</span></span>
                     <span className={'pill ' + s[0]}>{s[1]}</span>
                   </div>
+                  {enc.dias > 0 && <div className="err" style={{ fontSize: 12.5, marginTop: 4 }}>Em atraso há {enc.dias} dia(s) · {brl(enc.total)} com encargos</div>}
+                  {u?.status === 'enviado' && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Comprovante enviado em {data(u.criado_em)}</div>}
+                  {u?.status === 'confirmado' && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Confirmado em {data(u.revisado_em || u.criado_em)}</div>}
                   {u && <div className="row" style={{ gap: 6, marginTop: 6 }}>
                     <button onClick={() => abrir('comprovantes', u.comprovante_path)}>Ver comprovante</button>
                     {u.status === 'enviado' && <button className="p" onClick={() => revisar(u.id, 'confirmado')}>Confirmar</button>}
@@ -244,7 +251,7 @@ export default function Admin() {
       <section className="box">
         <h2>Formandos</h2>
         {!fams.length ? <p className="mut">Nenhuma família cadastrada ainda. Envie o link da proposta para os pais.</p>
-          : fams.map(f => <Familia key={f.id} f={f} env={pags.filter(p => p.familia_id === f.id)} nFotos={fotos.filter(x => x.familia_id === f.id).length} rostos={rostos.filter(r => r.familia_id === f.id)} recarregar={carregar} />)}
+          : fams.map(f => <Familia key={f.id} f={f} env={pags.filter(p => p.familia_id === f.id)} nFotos={fotos.filter(x => x.familia_id === f.id).length} rostos={rostos.filter(r => r.familia_id === f.id)} cfg={cfg} recarregar={carregar} />)}
       </section>
 
       <section className="box leg">
