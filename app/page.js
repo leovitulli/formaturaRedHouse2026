@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { sb, brl } from '@/lib/util'
-import { secoes, VERSAO } from '@/lib/proposta'
+import { secoes } from '@/lib/proposta'
 
 export default function Proposta() {
   const [cfg, setCfg] = useState({ preco: 630 })
@@ -11,7 +11,7 @@ export default function Proposta() {
     <main>
       <div>
         <h1>Proposta de cobertura da formatura</h1>
-        <p className="mut">Red House Santana · A/C Fernanda · Grupo de responsáveis pelos formandos · versão {VERSAO}</p>
+        <p className="mut">Red House Santana · A/C Fernanda · Grupo de responsáveis pelos formandos · data do evento: 12/12/26</p>
       </div>
 
       {secoes(cfg.preco, cfg).map(s => (
