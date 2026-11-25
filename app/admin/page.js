@@ -66,12 +66,21 @@ function GaleriaAdmin({ fid, nFotos, recarregar }) {
 const normTxt = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
 
 function waLink(f) {
-  let d = (f.telefone || '').replace(/\D/g, '')
+  let d = (f.telefone || '').replace(/\D/g, '').replace(/^0+/, '')
+  if (d.length > 11 && !d.startsWith('55')) d = d.slice(-11)
   if (d.length < 10) return null
   if (d.length <= 11 && !d.startsWith('55')) d = '55' + d
   const nome = (f.resp1_nome || '').trim().split(/\s+/)[0] || ''
   const txt = `Olá ${nome}, tudo bem? Aqui é o Léo Vitulli, sobre a formatura de ${f.formando_nome}.`
   return `https://wa.me/${d}?text=${encodeURIComponent(txt)}`
+}
+
+function fmtTel(t) {
+  const d = (t || '').replace(/\D/g, '').replace(/^0+/, '')
+  const n = d.length > 11 && !d.startsWith('55') ? d.slice(-11) : d
+  if (n.length === 11) return n.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
+  if (n.length === 10) return n.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
+  return t || '—'
 }
 
 function Familia({ f, env, nFotos, rostos, cfg, duplicado, outrasFams, mapaHashes, hashesRepetidos, recarregar }) {
@@ -125,30 +134,35 @@ function Familia({ f, env, nFotos, rostos, cfg, duplicado, outrasFams, mapaHashe
       </div>
       {aberta && <div className="det">
         <div className="det-grid">
-          <div className="card">
+          <div className="card" style={{ display: 'grid', gap: 8 }}>
             <small>Quem assinou</small>
-            <div className="row" style={{ gap: 10, marginTop: 4 }}>
+            <div className="row" style={{ gap: 10 }}>
               <span className="av">{f.resp1_nome.split(' ').map(x => x[0]).slice(0, 2).join('')}</span>
-              <div style={{ minWidth: 0 }}>
-                <b>{f.resp1_nome}</b>
-                <div className="mut">{f.resp1_parentesco} · CPF {f.resp1_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <b style={{ fontSize: 15, display: 'block', lineHeight: 1.3 }}>{f.resp1_nome}</b>
+                <div className="mut" style={{ fontSize: 12.5 }}>{f.resp1_parentesco} · CPF {f.resp1_cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}</div>
               </div>
             </div>
-            {f.resp2_nome && <div className="mut" style={{ marginTop: 6 }}>+ {f.resp2_nome} ({f.resp2_parentesco})</div>}
-            <div className="mut" style={{ marginTop: 6, wordBreak: 'break-all' }}>{f.telefone} · {f.email}</div>
-            <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Assinou em {data(f.aceite_em)}</div>
-            <div className="row" style={{ marginTop: 8, gap: 6 }}>
+            {f.resp2_nome && <div className="mut" style={{ fontSize: 13 }}>+ {f.resp2_nome} ({f.resp2_parentesco})</div>}
+            <div style={{ fontSize: 13, display: 'grid', gap: 4 }}>
+              <div className="row" style={{ gap: 8 }}>
+                <span>{fmtTel(f.telefone)}</span>
+                {waLink(f) && <a className="btn" href={waLink(f)} target="_blank" rel="noreferrer" style={{ fontSize: 12, padding: '2px 8px' }}>WhatsApp</a>}
+              </div>
+              <div className="mut" style={{ fontSize: 13, wordBreak: 'break-all' }}>{f.email}</div>
+              <div className="mut" style={{ fontSize: 12 }}>Assinou em {data(f.aceite_em)}</div>
+            </div>
+            <div className="row" style={{ gap: 6 }}>
               <span className={'pill ' + (rostos.length ? 'ok' : 'pe')}>{rostos.length ? '✓' : '✗'} Rosto</span>
               <span className={'pill ' + (f.aceite_portfolio ? 'ok' : 'pe')}>{f.aceite_portfolio ? '✓' : '✗'} Portfólio</span>
               <a href={'/admin/relatorio?f=' + f.id} style={{ fontSize: 13 }}>Relatório</a>
-              {waLink(f) && <a className="btn" href={waLink(f)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, padding: '3px 8px' }}>WhatsApp</a>}
             </div>
-            {!!rostos.length && <div className="row" style={{ gap: 6, marginTop: 6 }}>{rostos.map(r => <button key={r.id} style={{ fontSize: 12.5, padding: '3px 8px' }} onClick={() => abrir('selfies', r.path)}>Ver rosto: {({ formando: 'formando', mae: 'mãe', pai: 'pai', responsavel: 'responsável' })[r.tipo]}</button>)}</div>}
+            {!!rostos.length && <div className="row" style={{ gap: 6 }}>{rostos.map(r => <button key={r.id} style={{ fontSize: 12, padding: '3px 8px' }} onClick={() => abrir('selfies', r.path)}>Ver rosto: {({ formando: 'formando', mae: 'mãe', pai: 'pai', responsavel: 'responsável' })[r.tipo]}</button>)}</div>}
           </div>
 
           <div className="card">
             <small>Pagamento · {f.forma_pagamento === '2x' ? '2 parcelas' : 'à vista'}</small>
-            <div style={{ height: 8, borderRadius: 4, background: 'var(--line)', overflow: 'hidden', margin: '8px 0' }}><div style={{ height: '100%', width: Math.min(100, pago / f.valor * 100) + '%', background: 'var(--ok)' }} /></div>
+            <div style={{ height: 6, borderRadius: 4, background: 'var(--line)', overflow: 'hidden', margin: '8px 0' }}><div style={{ height: '100%', width: Math.min(100, pago / f.valor * 100) + '%', background: 'var(--ok)' }} /></div>
             {parcelas(f).map(pc => {
               const u = env.filter(x => x.parcela === pc.n).sort((a, b) => b.criado_em.localeCompare(a.criado_em))[0]
               const s = !u ? ['pe', 'Aguardando'] : u.status === 'confirmado' ? ['ok', 'Pago'] : u.status === 'enviado' ? ['an', 'Conferir'] : ['pe', 'Reenvio pedido']
@@ -157,31 +171,34 @@ function Familia({ f, env, nFotos, rostos, cfg, duplicado, outrasFams, mapaHashe
               const enc = (!u || u.status === 'recusado') ? encargos(pc.valor, cfg) : { dias: 0 }
               return (
                 <div key={pc.n} className="parc">
-                  <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <span className="num"><b>{brl(u?.valor ?? pc.valor)}</b> <span className="mut">{parcelas(f).length > 1 ? `${pc.n}ª parcela` : 'à vista'} · {prazo}</span></span>
+                  <div className="row" style={{ justifyContent: 'space-between', gap: 6 }}>
+                    <b style={{ fontSize: 14 }}>{parcelas(f).length > 1 ? `${pc.n}ª parcela` : 'À vista'}</b>
                     <span className={'pill ' + s[0]}>{s[1]}</span>
                   </div>
-                  {u && (u.comprovante_hash || mapaHashes?.get(u.id)) && hashesRepetidos?.has(u.comprovante_hash || mapaHashes.get(u.id)) && <div className="err" style={{ fontSize: 12.5, marginTop: 4 }}>Atenção: este mesmo arquivo de comprovante foi enviado em outro pagamento.</div>}
-                  {enc.dias > 0 && <div className="err" style={{ fontSize: 12.5, marginTop: 4 }}>Em atraso há {enc.dias} dia(s) · {brl(enc.total)} com encargos</div>}
-                  {u && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Pagador no recibo: <b style={{ color: 'var(--fg)' }}>{u.pagador_nome || f.resp1_nome}</b></div>}
-                  {u?.status === 'enviado' && <div className="mut" style={{ fontSize: 12.5, marginTop: 2 }}>Comprovante enviado em {data(u.criado_em)}</div>}
-                  {u?.status === 'confirmado' && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Confirmado em {data(u.revisado_em || u.criado_em)}</div>}
+                  <div className="num" style={{ fontSize: 14, marginTop: 2 }}><b>{brl(u?.valor ?? pc.valor)}</b> <span className="mut" style={{ fontSize: 12.5 }}>· {prazo}</span></div>
+                  {u && (u.comprovante_hash || mapaHashes?.get(u.id)) && hashesRepetidos?.has(u.comprovante_hash || mapaHashes.get(u.id)) && <div className="err" style={{ fontSize: 12, marginTop: 4 }}>Atenção: este mesmo arquivo de comprovante foi enviado em outro pagamento.</div>}
+                  {enc.dias > 0 && <div className="err" style={{ fontSize: 12, marginTop: 4 }}>Em atraso há {enc.dias} dia(s) · {brl(enc.total)} com encargos</div>}
+                  {u && <div className="mut" style={{ fontSize: 12, marginTop: 4 }}>Pagador: <b style={{ color: 'var(--fg)' }}>{u.pagador_nome || f.resp1_nome}</b></div>}
+                  {u?.status === 'enviado' && <div className="mut" style={{ fontSize: 12, marginTop: 2 }}>Enviado em {data(u.criado_em)}</div>}
+                  {u?.status === 'confirmado' && <div className="mut" style={{ fontSize: 12, marginTop: 2 }}>Confirmado em {data(u.revisado_em || u.criado_em)}</div>}
                   {u && <div className="row" style={{ gap: 6, marginTop: 6 }}>
-                    <button onClick={() => abrir('comprovantes', u.comprovante_path)}>Ver comprovante</button>
-                    {u.status === 'enviado' && <button className="p" onClick={() => revisar(u.id, 'confirmado')}>Confirmar</button>}
+                    <button style={{ fontSize: 12.5, padding: '4px 10px' }} onClick={() => abrir('comprovantes', u.comprovante_path)}>Ver comprovante</button>
+                    {u.status === 'enviado' && <button className="p" style={{ fontSize: 12.5, padding: '4px 10px' }} onClick={() => revisar(u.id, 'confirmado')}>Confirmar</button>}
                     {u.status === 'enviado' && <PedirNovo onOk={m => revisar(u.id, 'recusado', m)} />}
                     {u.status === 'confirmado' && <PedirNovo onOk={m => revisar(u.id, 'recusado', m)} />}
                   </div>}
-                  {u?.status === 'recusado' && u.motivo && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>{u.motivo}</div>}
+                  {u?.status === 'recusado' && u.motivo && <div className="mut" style={{ fontSize: 12, marginTop: 4 }}>{u.motivo}</div>}
                 </div>)
             })}
           </div>
 
-          <div className="card">
-            <small>Fotos</small>
-            <b className="num" style={{ display: 'block', fontSize: 28, margin: '4px 0' }}>{nFotos}</b>
-            <label className="btn" style={{ display: 'inline-block', color: 'var(--fg)' }}>+ Adicionar fotos<input type="file" accept="image/*" multiple onChange={enviarFotos} hidden /></label>
-            {up && <div className="mut" style={{ marginTop: 6 }}>{up}</div>}
+          <div className="card" style={{ display: 'grid', gap: 8 }}>
+            <small>Fotos na galeria</small>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <b className="num" style={{ fontSize: 22 }}>{nFotos}</b>
+              <label className="btn" style={{ color: 'var(--fg)', fontSize: 13, padding: '6px 12px' }}>+ Adicionar fotos<input type="file" accept="image/*" multiple onChange={enviarFotos} hidden /></label>
+            </div>
+            {up && <div className="mut" style={{ fontSize: 12.5 }}>{up}</div>}
           </div>
         </div>
         {nFotos > 0 && <GaleriaAdmin fid={f.id} nFotos={nFotos} recarregar={recarregar} />}
