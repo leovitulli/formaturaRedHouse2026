@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { sb, brl, data, parcelas, encargos } from '@/lib/util'
+import { useEffect, useRef, useState } from 'react'
+import { sb, brl, data, parcelas, encargos, compararComprovantes } from '@/lib/util'
 
 async function abrir(bucket, path) {
   const { data: d } = await sb.storage.from(bucket).createSignedUrl(path, 600)
@@ -63,9 +63,22 @@ function GaleriaAdmin({ fid, nFotos, recarregar }) {
   )
 }
 
-function Familia({ f, env, nFotos, rostos, cfg, recarregar }) {
+const normTxt = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
+
+function waLink(f) {
+  let d = (f.telefone || '').replace(/\D/g, '')
+  if (d.length < 10) return null
+  if (d.length <= 11 && !d.startsWith('55')) d = '55' + d
+  const nome = (f.resp1_nome || '').trim().split(/\s+/)[0] || ''
+  const txt = `Olá ${nome}, tudo bem? Aqui é o Léo Vitulli, sobre a formatura de ${f.formando_nome}.`
+  return `https://wa.me/${d}?text=${encodeURIComponent(txt)}`
+}
+
+function Familia({ f, env, nFotos, rostos, cfg, duplicado, outrasFams, mapaHashes, hashesRepetidos, recarregar }) {
   const [aberta, setAberta] = useState(false)
   const [up, setUp] = useState('')
+  const [unifId, setUnifId] = useState('')
+  const [unifErro, setUnifErro] = useState('')
   const pago = env.filter(x => x.status === 'confirmado').reduce((s, x) => s + +x.valor, 0)
   const analise = env.some(x => x.status === 'enviado')
   const st = pago >= f.valor ? ['ok', 'Quitado'] : analise ? ['an', 'Comprovante em análise'] : pago > 0 ? ['pa', 'Parcial'] : ['pe', 'Pendente']
@@ -87,11 +100,25 @@ function Familia({ f, env, nFotos, rostos, cfg, recarregar }) {
   async function apagar() {
     await sb.from('familias').delete().eq('id', f.id); recarregar()
   }
+  async function unificar() {
+    setUnifErro('')
+    const alvo = unifId || outrasFams[0]?.id
+    if (!alvo) return setUnifErro('Selecione o cadastro principal.')
+    const { error } = await sb.rpc('unificar_familias', { p_principal: alvo, p_duplicado: f.id })
+    if (error) return setUnifErro(error.message || 'Erro ao unificar. Rode o SQL 05_seguranca_duplicados.sql no Supabase.')
+    recarregar()
+  }
 
   return (
     <div className="fam">
       <div className="row">
-        <b style={{ flex: 1, minWidth: 180 }}>{f.formando_nome}</b>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <b>{f.formando_nome}{duplicado && <span className="pill pe" style={{ marginLeft: 8, fontSize: 11.5 }}>Possível duplicado</span>}</b>
+          <div className="mut" style={{ fontSize: 12.5 }}>
+            Pagador/Resp.: <b style={{ color: 'var(--fg)' }}>{[...new Set(env.filter(x => x.status !== 'recusado' && x.pagador_nome).map(x => x.pagador_nome))].join(', ') || f.resp1_nome}</b>
+            {f.resp2_nome ? ` · ${f.resp2_nome}` : ''}
+          </div>
+        </div>
         <span className="num">{brl(pago)} <span className="mut">de {brl(f.valor)}</span></span>
         <span className={'pill ' + st[0]}>{st[1]}</span>
         <button onClick={() => setAberta(!aberta)}>{aberta ? 'Fechar' : 'Abrir'}</button>
@@ -114,6 +141,7 @@ function Familia({ f, env, nFotos, rostos, cfg, recarregar }) {
               <span className={'pill ' + (rostos.length ? 'ok' : 'pe')}>{rostos.length ? '✓' : '✗'} Rosto</span>
               <span className={'pill ' + (f.aceite_portfolio ? 'ok' : 'pe')}>{f.aceite_portfolio ? '✓' : '✗'} Portfólio</span>
               <a href={'/admin/relatorio?f=' + f.id} style={{ fontSize: 13 }}>Relatório</a>
+              {waLink(f) && <a className="btn" href={waLink(f)} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, padding: '3px 8px' }}>WhatsApp</a>}
             </div>
             {!!rostos.length && <div className="row" style={{ gap: 6, marginTop: 6 }}>{rostos.map(r => <button key={r.id} style={{ fontSize: 12.5, padding: '3px 8px' }} onClick={() => abrir('selfies', r.path)}>Ver rosto: {({ formando: 'formando', mae: 'mãe', pai: 'pai', responsavel: 'responsável' })[r.tipo]}</button>)}</div>}
           </div>
@@ -133,8 +161,10 @@ function Familia({ f, env, nFotos, rostos, cfg, recarregar }) {
                     <span className="num"><b>{brl(u?.valor ?? pc.valor)}</b> <span className="mut">{parcelas(f).length > 1 ? `${pc.n}ª parcela` : 'à vista'} · {prazo}</span></span>
                     <span className={'pill ' + s[0]}>{s[1]}</span>
                   </div>
+                  {u && (u.comprovante_hash || mapaHashes?.get(u.id)) && hashesRepetidos?.has(u.comprovante_hash || mapaHashes.get(u.id)) && <div className="err" style={{ fontSize: 12.5, marginTop: 4 }}>Atenção: este mesmo arquivo de comprovante foi enviado em outro pagamento.</div>}
                   {enc.dias > 0 && <div className="err" style={{ fontSize: 12.5, marginTop: 4 }}>Em atraso há {enc.dias} dia(s) · {brl(enc.total)} com encargos</div>}
-                  {u?.status === 'enviado' && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Comprovante enviado em {data(u.criado_em)}</div>}
+                  {u && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Pagador no recibo: <b style={{ color: 'var(--fg)' }}>{u.pagador_nome || f.resp1_nome}</b></div>}
+                  {u?.status === 'enviado' && <div className="mut" style={{ fontSize: 12.5, marginTop: 2 }}>Comprovante enviado em {data(u.criado_em)}</div>}
                   {u?.status === 'confirmado' && <div className="mut" style={{ fontSize: 12.5, marginTop: 4 }}>Confirmado em {data(u.revisado_em || u.criado_em)}</div>}
                   {u && <div className="row" style={{ gap: 6, marginTop: 6 }}>
                     <button onClick={() => abrir('comprovantes', u.comprovante_path)}>Ver comprovante</button>
@@ -172,7 +202,18 @@ function Familia({ f, env, nFotos, rostos, cfg, recarregar }) {
             <div style={{ wordBreak: 'break-all' }}><b>Navegador:</b> {f.aceite_navegador || '—'}</div>
           </div>
         </details>
-        <div style={{ textAlign: 'right' }}><BotaoConfirmar txt="Excluir cadastro" onOk={apagar} /></div>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          {duplicado && outrasFams.length > 0 ? (
+            <div className="row" style={{ gap: 6 }}>
+              <select value={unifId || outrasFams[0]?.id || ''} onChange={e => setUnifId(e.target.value)} style={{ maxWidth: 320, fontSize: 12.5 }}>
+                {outrasFams.map(o => <option key={o.id} value={o.id}>Manter: {o.email} ({data(o.aceite_em).split(',')[0]}{o._pago > 0 ? ` · ${brl(o._pago)} pago` : ''})</option>)}
+              </select>
+              <BotaoConfirmar txt="Unificar neste principal e apagar este" cls="p" onOk={unificar} />
+            </div>
+          ) : <span />}
+          <BotaoConfirmar txt="Excluir cadastro" onOk={apagar} />
+        </div>
+        {unifErro && <p className="err" style={{ fontSize: 12.5 }}>{unifErro}</p>}
       </div>}
     </div>
   )
@@ -183,6 +224,9 @@ export default function Admin() {
   const [cfg, setCfg] = useState(null)
   const [salvo, setSalvo] = useState(false)
   const [aoVivo, setAoVivo] = useState(false)
+  const [busca, setBusca] = useState('')
+  const [compInfo, setCompInfo] = useState({ mapa: new Map(), repetidos: new Set() })
+  const hashCache = useRef(new Map())
 
   async function carregar(forcarCfg = false) {
     const { data: { session } } = await sb.auth.getSession()
@@ -217,6 +261,9 @@ export default function Admin() {
       clearInterval(timer)
     }
   }, [])
+  useEffect(() => {
+    if (st?.pags?.length) compararComprovantes(st.pags, hashCache.current).then(setCompInfo)
+  }, [st?.pags])
 
   async function salvarCfg(e) {
     e.preventDefault()
@@ -240,6 +287,18 @@ export default function Admin() {
   const lucro = meta - custo
   const pct = v => Math.min(100, meta ? v / meta * 100 : 0)
   const aConferir = pags.filter(p => p.status === 'enviado').length
+  const cNome = new Map(), cCpf = new Map()
+  for (const f of fams) {
+    const n = normTxt(f.formando_nome), k = `${(f.resp1_cpf || '').replace(/\D/g, '')}:${n.split(' ')[0]}`
+    if (n) cNome.set(n, (cNome.get(n) || 0) + 1)
+    if (f.resp1_cpf) cCpf.set(k, (cCpf.get(k) || 0) + 1)
+  }
+  const hashesRepetidos = compInfo.repetidos
+  const famsComCompRep = [...new Set(pags.filter(p => hashesRepetidos.has(compInfo.mapa.get(p.id))).map(p => fams.find(f => f.id === p.familia_id)?.formando_nome).filter(Boolean))]
+  const ehDup = f => {
+    const n = normTxt(f.formando_nome), k = `${(f.resp1_cpf || '').replace(/\D/g, '')}:${n.split(' ')[0]}`
+    return (cNome.get(n) || 0) > 1 || (f.resp1_cpf && (cCpf.get(k) || 0) > 1)
+  }
   const c = k => e => setCfg({ ...cfg, [k]: e.target.value })
 
   function exportarCsv() {
@@ -266,7 +325,7 @@ export default function Admin() {
     <main>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h1>Painel da formatura</h1>
-        <div className="row"><span className={'pill ' + (aoVivo ? 'ok' : 'pe')} title="Atualiza automaticamente quando uma família assinar ou enviar comprovante">{aoVivo ? '● Ao vivo' : 'Atualização automática'}</span><a className="btn p" href="/admin/reconhecimento">Separar fotos</a><a className="btn" href="/admin/plaquinhas">Plaquinhas</a><a className="btn" href="/admin/relatorio">Relatório jurídico</a><button onClick={() => carregar(true)}>Atualizar</button><button onClick={async () => { await sb.auth.signOut(); location.href = '/' }}>Sair</button></div>
+        <div className="row"><span className={'pill ' + (aoVivo ? 'ok' : 'pe')} title="Atualiza automaticamente quando uma família assinar ou enviar comprovante">{aoVivo ? '● Ao vivo' : 'Atualização automática'}</span><a className="btn p" href="/admin/reconhecimento">Separar fotos</a><a className="btn" href="/admin/comprovantes">Comprovantes</a><a className="btn" href="/admin/plaquinhas">Plaquinhas</a><a className="btn" href="/admin/relatorio">Relatório jurídico</a><button onClick={() => carregar(true)}>Atualizar</button><button onClick={async () => { await sb.auth.signOut(); location.href = '/' }}>Sair</button></div>
       </div>
 
       <section className="box">
@@ -282,16 +341,31 @@ export default function Admin() {
           <div className="card"><small>Famílias cadastradas</small><b className="num">{fams.length} de {total}</b></div>
         </div>
         {aConferir > 0 && <p style={{ color: 'var(--info)' }}><b>{aConferir} comprovante(s) para conferir</b> ({brl(analise)}). Abra a família com o selo azul.</p>}
+        {famsComCompRep.length > 0 && <p className="err"><b>Atenção: comprovante repetido detectado</b> (mesmo arquivo enviado mais de uma vez): {famsComCompRep.join(', ')}.</p>}
         <p className="mut">Custo do evento {brl(custo)} · <b style={{ color: lucro < 0 ? 'var(--bad)' : 'var(--ok)' }}>seu lucro se todos pagarem: {brl(lucro)}</b></p>
       </section>
 
       <section className="box">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
           <h2>Formandos</h2>
-          {!!fams.length && <button type="button" onClick={exportarCsv}>Exportar planilha (CSV)</button>}
+          <div className="row" style={{ gap: 8, flex: 1, justifyContent: 'flex-end' }}>
+            {!!fams.length && <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome no recibo, responsável ou formando…" style={{ maxWidth: 340, flex: 1 }} />}
+            {!!fams.length && <button type="button" onClick={exportarCsv}>Exportar planilha (CSV)</button>}
+          </div>
         </div>
         {!fams.length ? <p className="mut">Nenhuma família cadastrada ainda. Envie o link da proposta para os pais.</p>
-          : fams.map(f => <Familia key={f.id} f={f} env={pags.filter(p => p.familia_id === f.id)} nFotos={fotos.filter(x => x.familia_id === f.id).length} rostos={rostos.filter(r => r.familia_id === f.id)} cfg={cfg} recarregar={carregar} />)}
+          : fams.filter(f => {
+              const q = normTxt(busca)
+              if (!q) return true
+              const pagsFam = pags.filter(p => p.familia_id === f.id).map(p => p.pagador_nome)
+              return [f.formando_nome, f.resp1_nome, f.resp2_nome, f.resp1_cpf, ...pagsFam].some(v => normTxt(v).includes(q))
+            }).map(f => {
+              const outras = fams
+                .filter(o => o.id !== f.id && (normTxt(o.formando_nome) === normTxt(f.formando_nome) || (f.resp1_cpf && o.resp1_cpf === f.resp1_cpf)))
+                .map(o => ({ ...o, _pago: pags.filter(p => p.familia_id === o.id && p.status === 'confirmado').reduce((s, p) => s + +p.valor, 0) }))
+                .sort((a, b) => b._pago - a._pago || a.aceite_em.localeCompare(b.aceite_em))
+              return <Familia key={f.id} f={f} env={pags.filter(p => p.familia_id === f.id)} nFotos={fotos.filter(x => x.familia_id === f.id).length} rostos={rostos.filter(r => r.familia_id === f.id)} cfg={cfg} duplicado={ehDup(f)} outrasFams={outras} mapaHashes={compInfo.mapa} hashesRepetidos={hashesRepetidos} recarregar={carregar} />
+            })}
       </section>
 
       <section className="box leg">

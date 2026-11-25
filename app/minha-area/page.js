@@ -3,10 +3,17 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { sb, brl, data, parcelas, pixPayload, encargos } from '@/lib/util'
 
+async function hashArquivo(arq) {
+  const buf = await arq.arrayBuffer()
+  const digest = await crypto.subtle.digest('SHA-256', buf)
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 function Parcela({ p, fam, cfg, envios, recarregar }) {
   const ult = envios.filter(x => x.parcela === p.n).sort((a, b) => b.criado_em.localeCompare(a.criado_em))[0]
   const [qr, setQr] = useState('')
   const [arq, setArq] = useState(null)
+  const [pagador, setPagador] = useState(fam.resp1_nome || '')
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -18,13 +25,22 @@ function Parcela({ p, fam, cfg, envios, recarregar }) {
 
   async function enviar() {
     if (!arq) return setErro('Selecione o comprovante (foto ou PDF).')
-    setEnviando(true)
-    const path = `${fam.user_id}/parcela${p.n}-${Date.now()}.${arq.name.split('.').pop()}`
-    const { error } = await sb.storage.from('comprovantes').upload(path, arq)
-    if (!error) {
-      const { error: e2 } = await sb.from('pagamentos').insert({ familia_id: fam.id, parcela: p.n, valor: valorPagar, comprovante_path: path })
-      if (!e2) { setEnviando(false); return recarregar() }
-    }
+    setEnviando(true); setErro('')
+    try {
+      const hash = await hashArquivo(arq)
+      const path = `${fam.user_id}/parcela${p.n}-${Date.now()}.${arq.name.split('.').pop()}`
+      const { error } = await sb.storage.from('comprovantes').upload(path, arq)
+      if (!error) {
+        const pagNome = pagador.trim() || fam.resp1_nome
+        let { error: e2 } = await sb.from('pagamentos').insert({ familia_id: fam.id, parcela: p.n, valor: valorPagar, comprovante_path: path, comprovante_hash: hash, pagador_nome: pagNome })
+        if (e2 && /comprovante_hash|pagador_nome/i.test(e2.message)) {
+          ({ error: e2 } = await sb.from('pagamentos').insert({ familia_id: fam.id, parcela: p.n, valor: valorPagar, comprovante_path: path }))
+        }
+        if (!e2) { setEnviando(false); return recarregar() }
+        setEnviando(false)
+        return setErro('Não foi possível enviar. Tente de novo.')
+      }
+    } catch { }
     setEnviando(false); setErro('Não foi possível enviar. Tente de novo.')
   }
   async function copiar() {
@@ -32,11 +48,13 @@ function Parcela({ p, fam, cfg, envios, recarregar }) {
   }
 
   const status = !ult ? ['pe', 'Aguardando pagamento'] : ult.status === 'confirmado' ? ['ok', 'Pago'] : ult.status === 'enviado' ? ['an', 'Comprovante em análise'] : ['pe', 'Pendente']
+  const compRepetido = ult && ult.status !== 'recusado' && ult.comprovante_hash && envios.some(x => x.id !== ult.id && x.status !== 'recusado' && x.comprovante_hash === ult.comprovante_hash)
   return (
     <div className="box">
       <div className="row"><b>{p.n === 1 && fam.forma_pagamento === 'avista' ? 'Pagamento à vista' : `Parcela ${p.n} de 2`}</b>
         <span className="num">{brl(aberta ? valorPagar : (ult?.valor ?? p.valor))} · {p.quando}</span><span className={'pill ' + status[0]}>{status[1]}</span></div>
       {ult && ult.status !== 'recusado' && <p className="mut">Comprovante enviado em {data(ult.criado_em)}.</p>}
+      {compRepetido && <p className="err">Este comprovante parece repetido e está sendo analisado. Qualquer coisa entro em contato.</p>}
       {ult?.status === 'recusado' && <p className="err">Precisamos de um novo comprovante. {ult.motivo || 'Confira o valor e envie novamente.'}</p>}
       {aberta && <>
         {enc.dias > 0 && <p className="err">Em atraso há {enc.dias} dia(s). Valor original {brl(p.valor)} + multa de {cfg.multa_pct}% ({brl(enc.multa)}) + juros de {cfg.juros_mes}% ao mês proporcionais ({brl(enc.juros)}) = <b>{brl(enc.total)}</b>. O QR Code já está com o valor atualizado de hoje.</p>}
@@ -49,6 +67,7 @@ function Parcela({ p, fam, cfg, envios, recarregar }) {
             <p className="mut">Favorecido: {cfg.pix_nome}</p>
           </div>
         </div>
+        <label>Nome de quem pagou (como aparece no comprovante)<input value={pagador} onChange={e => setPagador(e.target.value)} placeholder="Ex.: nome do titular da conta Pix" /></label>
         <label>Comprovante<input type="file" accept="image/*,application/pdf" onChange={e => { setArq(e.target.files[0]); setErro('') }} /></label>
         {erro && <p className="err">{erro}</p>}
         <div><button className="p" onClick={enviar} disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar comprovante'}</button></div>
@@ -183,10 +202,10 @@ export default function MinhaArea() {
         <h2>Fotos de {fam.formando_nome.split(' ')[0]}</h2>
         {!quitado ? <p className="mut">As fotos ficam disponíveis aqui depois que o pagamento total for confirmado.</p>
           : !fotos.length ? <p className="mut">As fotos serão publicadas aqui em até 15 dias úteis após o evento.</p>
-          : <>
-            <p className="mut">{fotos.length} fotos. Toque em "baixar" para salvar cada uma. Os links valem por 1 hora; se expirar, recarregue a página.</p>
-            <div className="galeria">{fotos.map((f, i) => <div key={i}><a href={f.ver} target="_blank" rel="noreferrer"><img src={f.ver} alt={`Foto ${i + 1}`} loading="lazy" /></a><a href={f.baixar} className="mut" style={{ background: 'none', aspectRatio: 'auto' }}>baixar</a></div>)}</div>
-          </>}
+            : <>
+              <p className="mut">{fotos.length} fotos. Toque em "baixar" para salvar cada uma. Os links valem por 1 hora; se expirar, recarregue a página.</p>
+              <div className="galeria">{fotos.map((f, i) => <div key={i}><a href={f.ver} target="_blank" rel="noreferrer"><img src={f.ver} alt={`Foto ${i + 1}`} loading="lazy" /></a><a href={f.baixar} className="mut" style={{ background: 'none', aspectRatio: 'auto' }}>baixar</a></div>)}</div>
+            </>}
       </section>
 
       <section className="box leg">

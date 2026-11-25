@@ -39,6 +39,14 @@ export default function Cadastro() {
 
     setEnviando(true)
     try {
+      if (!logado) {
+        const { data: dupMsg, error: eDup } = await sb.rpc('verificar_cadastro_duplicado', {
+          p_formando: f.formando.trim(),
+          p_cpf: f.cpf.replace(/\D/g, ''),
+          p_resp1: f.r1.trim()
+        })
+        if (!eDup && dupMsg) throw new Error(dupMsg)
+      }
       let user = logado
       if (!user) {
         const email = f.email.trim()
@@ -69,7 +77,7 @@ export default function Cadastro() {
         aceite_navegador: navigator.userAgent.slice(0, 300), selfie_path,
         aceite_texto: textoProposta(cfg?.preco ?? 630, cfg || {}), aceite_versao: VERSAO
       })
-      if (e2) throw new Error('Não foi possível salvar o cadastro. Tente de novo.')
+      if (e2) throw new Error(/já existe|duplicad/i.test(e2.message) ? e2.message : 'Não foi possível salvar o cadastro. Tente de novo.')
       if (selfie_path) {
         const { data: fam } = await sb.from('familias').select('id').eq('user_id', uid).single()
         if (fam) await sb.from('rostos').insert({ familia_id: fam.id, tipo: 'formando', path: selfie_path, consentimento: true })
@@ -117,7 +125,7 @@ export default function Cadastro() {
         {f.bio && <label>Foto do rosto do formando, de frente e com boa luz<input type="file" accept="image/*" onChange={s('selfie')} /></label>}
         <label className="chk"><input type="checkbox" checked={!!f.port} onChange={s('port')} /> Autorizo o uso de imagens do formando na divulgação do trabalho do Léo Vitulli (portfólio e redes). (opcional)</label>
 
-        {erro && <p className="err" role="alert">{erro}</p>}
+        {erro && <p className="err" role="alert">{erro}{/já existe/i.test(erro) && <> <a href="/entrar" style={{ fontWeight: 700, textDecoration: 'underline' }}>Clique aqui para Entrar</a></>}</p>}
         <div><button className="p" disabled={enviando}>{enviando ? 'Enviando…' : 'Assinar e ir para o pagamento'}</button></div>
         <p className="mut">Ao assinar, registramos data, hora, endereço IP, navegador e o texto integral da proposta (versão {VERSAO}) como assinatura eletrônica (Lei 14.063/2020 e MP 2.200-2/2001, art. 10, §2º).</p>
       </form>
