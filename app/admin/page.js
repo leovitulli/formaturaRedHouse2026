@@ -96,6 +96,27 @@ function Familia({ f, env, nFotos, rostos, cfg, duplicado, outrasFams, mapaHashe
     await sb.from('pagamentos').update({ status, motivo, revisado_em: new Date().toISOString() }).eq('id', id)
     recarregar()
   }
+  async function anexarComprovante(parcelaNum, valorParcela, e) {
+    const arq = e.target.files?.[0]
+    e.target.value = ''
+    if (!arq) return
+    setUp('Anexando comprovante…')
+    try {
+      const dig = await crypto.subtle.digest('SHA-256', await arq.arrayBuffer())
+      const hash = [...new Uint8Array(dig)].map(b => b.toString(16).padStart(2, '0')).join('')
+      const ext = (arq.name.split('.').pop() || 'jpg').replace(/[^\w]/g, '')
+      const path = `${f.user_id}/parcela${parcelaNum}-${Date.now()}.${ext}`
+      const { error: e1 } = await sb.storage.from('comprovantes').upload(path, arq)
+      if (e1) return setUp('Erro no upload. Rode o SQL 06_admin_comprovante.sql no Supabase.')
+      const { error: e2 } = await sb.from('pagamentos').insert({
+        familia_id: f.id, parcela: parcelaNum, valor: valorParcela,
+        comprovante_path: path, comprovante_hash: hash,
+        pagador_nome: f.resp1_nome, status: 'enviado'
+      })
+      if (e2) return setUp('Erro ao salvar. Rode o SQL 06_admin_comprovante.sql no Supabase.')
+      setUp(''); recarregar()
+    } catch { setUp('Não foi possível anexar o comprovante.') }
+  }
   async function enviarFotos(e) {
     const arqs = [...e.target.files]; let ok = 0
     for (const a of arqs) {
@@ -188,6 +209,14 @@ function Familia({ f, env, nFotos, rostos, cfg, duplicado, outrasFams, mapaHashe
                     {u.status === 'confirmado' && <PedirNovo onOk={m => revisar(u.id, 'recusado', m)} />}
                   </div>}
                   {u?.status === 'recusado' && u.motivo && <div className="mut" style={{ fontSize: 12, marginTop: 4 }}>{u.motivo}</div>}
+                  {(!u || u.status === 'recusado') && (
+                    <div style={{ marginTop: 6 }}>
+                      <label className="btn" style={{ color: 'var(--fg)', fontSize: 12.5, padding: '4px 10px' }}>
+                        + Anexar comprovante
+                        <input type="file" accept="image/*,application/pdf" onChange={e => anexarComprovante(pc.n, pc.valor, e)} hidden />
+                      </label>
+                    </div>
+                  )}
                 </div>)
             })}
           </div>
@@ -372,17 +401,17 @@ export default function Admin() {
         </div>
         {!fams.length ? <p className="mut">Nenhuma família cadastrada ainda. Envie o link da proposta para os pais.</p>
           : fams.filter(f => {
-              const q = normTxt(busca)
-              if (!q) return true
-              const pagsFam = pags.filter(p => p.familia_id === f.id).map(p => p.pagador_nome)
-              return [f.formando_nome, f.resp1_nome, f.resp2_nome, f.resp1_cpf, ...pagsFam].some(v => normTxt(v).includes(q))
-            }).map(f => {
-              const outras = fams
-                .filter(o => o.id !== f.id && (normTxt(o.formando_nome) === normTxt(f.formando_nome) || (f.resp1_cpf && o.resp1_cpf === f.resp1_cpf)))
-                .map(o => ({ ...o, _pago: pags.filter(p => p.familia_id === o.id && p.status === 'confirmado').reduce((s, p) => s + +p.valor, 0) }))
-                .sort((a, b) => b._pago - a._pago || a.aceite_em.localeCompare(b.aceite_em))
-              return <Familia key={f.id} f={f} env={pags.filter(p => p.familia_id === f.id)} nFotos={fotos.filter(x => x.familia_id === f.id).length} rostos={rostos.filter(r => r.familia_id === f.id)} cfg={cfg} duplicado={ehDup(f)} outrasFams={outras} mapaHashes={compInfo.mapa} hashesRepetidos={hashesRepetidos} recarregar={carregar} />
-            })}
+            const q = normTxt(busca)
+            if (!q) return true
+            const pagsFam = pags.filter(p => p.familia_id === f.id).map(p => p.pagador_nome)
+            return [f.formando_nome, f.resp1_nome, f.resp2_nome, f.resp1_cpf, ...pagsFam].some(v => normTxt(v).includes(q))
+          }).map(f => {
+            const outras = fams
+              .filter(o => o.id !== f.id && (normTxt(o.formando_nome) === normTxt(f.formando_nome) || (f.resp1_cpf && o.resp1_cpf === f.resp1_cpf)))
+              .map(o => ({ ...o, _pago: pags.filter(p => p.familia_id === o.id && p.status === 'confirmado').reduce((s, p) => s + +p.valor, 0) }))
+              .sort((a, b) => b._pago - a._pago || a.aceite_em.localeCompare(b.aceite_em))
+            return <Familia key={f.id} f={f} env={pags.filter(p => p.familia_id === f.id)} nFotos={fotos.filter(x => x.familia_id === f.id).length} rostos={rostos.filter(r => r.familia_id === f.id)} cfg={cfg} duplicado={ehDup(f)} outrasFams={outras} mapaHashes={compInfo.mapa} hashesRepetidos={hashesRepetidos} recarregar={carregar} />
+          })}
       </section>
 
       <section className="box leg">
